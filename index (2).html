@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0D0B08">
+<title>TheCafFiend · Film / Analog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+:root{
+  --bg:#1A1410;--bg2:#110E09;--bg3:#0D0B08;
+  --line:#2A1F12;--line2:#3A2818;
+  --paper:#EFE5D0;--paper2:#E0D4B8;
+  --amber:#D4A574;--amber-d:#8B5A2B;--amber-l:#E8C898;
+  --rust:#A8552A;--ink:#3A2818;
+  --dim:#6B5A40;--dim2:#8B7A40;--text:#D4C4A0;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='1' height='1' fill='%23FFE8A0' opacity='.055'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23FFD080' opacity='.04'/%3E%3Crect x='3' y='0' width='1' height='1' fill='%23FFC060' opacity='.025'/%3E%3Crect x='1' y='3' width='1' height='1' fill='%23FFE8C0' opacity='.02'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:#000;color:var(--text);font-family:'IBM Plex Mono',monospace;overflow-x:hidden}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at top,#1A1410 0%,#000 70%)}
+
+.device{width:100%;max-width:420px;height:100vh;max-height:880px;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+@media(min-width:600px){.device{border-radius:46px;border:2px solid #1A1208;height:880px;box-shadow:0 30px 80px rgba(0,0,0,.6)}}
+
+/* GRAIN — static, no continuous animation. The scrolling areas are exempted via .device-noisefree for perf */
+.device::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:200;background-image:var(--grain);mix-blend-mode:overlay;opacity:.7}
+
+.statusbar{padding:14px 22px 6px;display:flex;justify-content:space-between;font-size:11px;color:var(--dim);font-weight:500;letter-spacing:.5px;flex-shrink:0;background:var(--bg3);position:relative;z-index:5}
+
+.screen{display:none;flex-direction:column;flex:1;overflow:hidden;animation:fadeIn .35s ease both}
+.screen.active{display:flex}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* HOME */
+.home-header{padding:8px 22px 12px;background:var(--bg3);border-bottom:1px solid var(--line);flex-shrink:0;position:relative;z-index:4}
+.brand-row{display:flex;justify-content:space-between;align-items:baseline}
+.brand{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:var(--amber);letter-spacing:3px;font-style:italic}
+.brand span{font-style:normal;font-weight:400;letter-spacing:1px;color:var(--amber-l)}
+.city-row{display:flex;align-items:center;gap:6px;margin-top:4px;cursor:pointer;width:fit-content}
+.city-pin{font-size:9px;color:var(--rust);letter-spacing:1px}
+.city-name{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;color:var(--amber-l);border-bottom:1px dashed var(--line2);padding-bottom:1px}
+.city-name.unset{color:var(--dim2)}
+.exif{display:flex;gap:14px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line2)}
+.exif span{font-size:9px;color:var(--dim2);letter-spacing:1.3px;font-weight:500}
+.exif span b{color:var(--amber);font-weight:600;margin-left:3px}
+
+.roll{flex:1;display:flex;position:relative;overflow:hidden}
+.sprocket-strip{width:24px;background:var(--bg3);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:7px;border-right:1px solid var(--line);flex-shrink:0;overflow:hidden;position:relative;z-index:3}
+.sprocket{width:11px;height:7px;background:var(--bg);border-radius:1.5px;flex-shrink:0}
+
+/* SCROLL PERFORMANCE: GPU-promoted layer, native momentum, contain paint */
+.feed{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 12px 110px;scrollbar-width:none;-webkit-overflow-scrolling:touch;transform:translateZ(0);contain:layout style paint;position:relative;z-index:1}
+.feed::-webkit-scrollbar{display:none}
+
+.polaroid{background:var(--paper);padding:10px 10px 30px;margin:0 6px 18px;position:relative;cursor:pointer;transition:transform .25s cubic-bezier(.2,.8,.2,1);will-change:transform;transform:translateZ(0) rotate(var(--rot,-1.5deg))}
+.polaroid:active{transform:translateZ(0) rotate(0) scale(.97);transition:transform .15s ease}
+.polaroid.dev-in{animation:polIn .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes polIn{from{opacity:0;transform:translateZ(0) rotate(var(--rot,-1.5deg)) translateY(24px) scale(.94)}to{opacity:1;transform:translateZ(0) rotate(var(--rot,-1.5deg))}}
+
+.photo{aspect-ratio:5/4;position:relative;overflow:hidden;background:#1A1410}
+.photo::after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 30px rgba(0,0,0,.4);pointer-events:none}
+.photo.placeholder{background:linear-gradient(135deg,#2A1F12 0%,#3A2818 100%);display:flex;align-items:center;justify-content:center}
+.photo.placeholder::before{content:'—';font-family:'Cormorant Garamond',serif;font-size:34px;color:var(--line2);font-style:italic}
+
+.caption{font-family:'Caveat',cursive;font-size:18px;color:var(--ink);text-align:center;margin-top:8px;line-height:1;font-weight:600;padding:0 4px;word-break:break-word}
+.subcaption{font-family:'Caveat',cursive;font-size:13px;color:#6B5A3A;text-align:center;margin-top:1px;font-weight:500;padding:0 4px}
+.frame-no{position:absolute;top:14px;right:14px;font-family:'IBM Plex Mono',monospace;font-size:8px;color:#5A4828;letter-spacing:1px;background:rgba(239,229,208,.7);padding:2px 5px;font-weight:600}
+
+/* EMPTY STATE */
+.empty-roll{margin:32px 14px 0;padding:42px 24px;border:1px dashed var(--line2);text-align:center;background:transparent;transform:rotate(-1deg)}
+.empty-roll .icon{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:46px;color:var(--line2);margin-bottom:14px;line-height:.6}
+.empty-roll .msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:18px;color:var(--text);margin-bottom:8px}
+.empty-roll .sub{font-size:9px;color:var(--dim);letter-spacing:2.5px;text-transform:uppercase;line-height:1.5}
+
+.shutter-bar{position:absolute;left:0;right:0;bottom:62px;display:flex;justify-content:center;pointer-events:none;z-index:50}
+.shutter{pointer-events:auto;width:62px;height:62px;border-radius:50%;background:var(--bg2);border:3px solid var(--amber);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform .15s ease;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.shutter::before{content:'';width:44px;height:44px;border-radius:50%;background:var(--amber);transition:transform .15s ease,background .15s}
+.shutter:active{transform:scale(.92)}
+.shutter:active::before{transform:scale(.85);background:var(--amber-l)}
+.shutter-label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--amber);letter-spacing:2px;font-weight:600;white-space:nowrap}
+
+.tabbar{display:flex;background:var(--bg3);border-top:1px solid var(--line);padding:8px 0 10px;flex-shrink:0;z-index:60;position:relative}
+.tab{flex:1;text-align:center;font-size:9px;color:var(--dim);letter-spacing:2px;font-weight:500;cursor:pointer;padding:6px 0;transition:color .2s}
+.tab .ti{font-size:14px;display:block;margin-bottom:3px}
+.tab.active{color:var(--amber)}
+
+/* DETAIL */
+.detail-back{padding:14px 22px;background:var(--bg3);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;position:relative;z-index:4}
+.back-arrow{font-size:14px;color:var(--amber)}
+.back-label{font-size:10px;color:var(--amber);letter-spacing:2px;font-weight:500}
+.detail-frame-no{margin-left:auto;font-size:9px;color:var(--dim);letter-spacing:1.5px}
+
+.detail-body{flex:1;overflow-y:auto;padding:22px 24px 30px;scrollbar-width:none;-webkit-overflow-scrolling:touch;transform:translateZ(0);contain:layout style paint}
+.detail-body::-webkit-scrollbar{display:none}
+
+.hero-polaroid{background:var(--paper);padding:14px 14px 40px;transform:rotate(-1.2deg);margin-bottom:24px}
+.hero-polaroid .photo{aspect-ratio:1/1.05}
+.hero-polaroid .caption{font-size:24px;margin-top:14px}
+.hero-polaroid .subcaption{font-size:16px;margin-top:3px}
+
+.section-label{font-size:9px;color:var(--dim2);letter-spacing:3px;font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:1px dashed var(--line2);text-transform:uppercase}
+
+.metadata-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;margin-bottom:26px}
+.meta-key{font-size:8px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;font-weight:500}
+.meta-val{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--amber);font-style:italic;font-weight:500;line-height:1.1;word-break:break-word}
+
+.notes{font-family:'Cormorant Garamond',serif;font-size:15px;line-height:1.55;color:var(--text);font-style:italic;margin-bottom:26px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.notes.empty{color:var(--dim);font-size:13px}
+
+/* CAPTURE */
+.capture{flex:1;display:flex;flex-direction:column;background:var(--bg3);position:relative}
+.viewfinder{flex:1;display:flex;flex-direction:column;padding:16px 22px;position:relative;overflow:hidden;border-bottom:1px solid var(--line);min-height:160px}
+.cam-video{position:absolute;top:24px;left:24px;right:24px;bottom:24px;width:auto;height:auto;object-fit:contain;filter:sepia(.25) saturate(1.15) contrast(1.1) brightness(.95);background:#000;z-index:0}
+.cam-error{position:absolute;top:24px;left:24px;right:24px;bottom:24px;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:10px;color:var(--dim2);letter-spacing:2px;background:var(--bg2);line-height:1.7;z-index:0;cursor:pointer;text-transform:uppercase}
+.cam-error.show{display:flex}
+.vf-readout,.reticle{position:relative;z-index:2}
+.vf-corner{z-index:3}
+.vf-corner{position:absolute;width:24px;height:24px;border:2px solid var(--amber)}
+.vf-corner.tl{top:16px;left:16px;border-right:0;border-bottom:0}
+.vf-corner.tr{top:16px;right:16px;border-left:0;border-bottom:0}
+.vf-corner.bl{bottom:16px;left:16px;border-right:0;border-top:0}
+.vf-corner.br{bottom:16px;right:16px;border-left:0;border-top:0}
+.vf-readout{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px}
+.vf-rec{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--rust);letter-spacing:2px;font-weight:600}
+.vf-rec .dot{width:7px;height:7px;border-radius:50%;background:var(--rust);animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.vf-frame{font-size:10px;color:var(--amber);letter-spacing:1.5px;font-weight:500}
+.vf-iso{font-size:10px;color:var(--dim2);letter-spacing:1.5px}
+
+.reticle{flex:1;display:flex;align-items:center;justify-content:center;position:relative;margin:8px 0 14px}
+.reticle::before{content:'';width:140px;height:140px;border:1px dashed rgba(212,165,116,.4);border-radius:50%}
+.reticle::after{content:'';position:absolute;width:8px;height:8px;background:var(--amber);border-radius:50%}
+.cross-h,.cross-v{position:absolute;background:rgba(212,165,116,.4)}
+.cross-h{width:50px;height:1px}
+.cross-v{width:1px;height:50px}
+
+.capture-fields{padding:18px 22px;background:var(--bg2);flex-shrink:0;border-top:1px solid var(--line);position:relative;z-index:5}
+.field{margin-bottom:14px;position:relative}
+.field:last-child{margin-bottom:0}
+.field-label{font-size:8px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;font-weight:600}
+.field-input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line2);padding:4px 0 6px;color:var(--amber);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:18px;font-weight:500;outline:none}
+.field-input::placeholder{color:var(--dim);font-style:italic}
+.field-input:focus{border-bottom-color:var(--amber)}
+
+/* Autocomplete dropdown */
+.suggestions{position:absolute;top:100%;left:0;right:0;background:var(--bg3);border:1px solid var(--line2);max-height:160px;overflow-y:auto;z-index:20;display:none}
+.suggestions.show{display:block}
+.sug{padding:9px 12px;cursor:pointer;border-bottom:1px dotted var(--line2);font-family:'Cormorant Garamond',serif;font-size:14px;font-style:italic;color:var(--text)}
+.sug:last-child{border-bottom:0}
+.sug:hover,.sug:active{background:var(--bg2);color:var(--amber)}
+.sug-addr{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-top:2px;font-style:normal}
+
+.dial{display:flex;gap:6px;flex-wrap:wrap}
+.dial-opt{padding:6px 11px;border:1px solid var(--line2);font-size:9px;color:var(--dim2);letter-spacing:1.5px;cursor:pointer;font-weight:500;transition:all .2s;text-transform:uppercase}
+.dial-opt.selected{background:var(--amber);color:var(--bg3);border-color:var(--amber)}
+
+.f-stops{display:flex;gap:4px;align-items:center;margin-top:4px}
+.f-stop{flex:1;height:32px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;color:var(--dim2);cursor:pointer;transition:all .2s}
+.f-stop.selected{background:var(--amber);color:var(--bg3);border-color:var(--amber);font-weight:600}
+
+.shoot-btn{padding:16px 22px 20px;background:var(--bg3);display:flex;justify-content:center;flex-shrink:0;position:relative;z-index:5}
+.big-shutter{width:64px;height:64px;border-radius:50%;background:var(--bg2);border:3px solid var(--amber);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform .15s}
+.big-shutter::before{content:'';width:46px;height:46px;border-radius:50%;background:var(--amber);transition:transform .15s,background .15s}
+.big-shutter:active{transform:scale(.93)}
+.big-shutter:active::before{background:#fff}
+
+.flash{position:absolute;inset:0;background:#fff;z-index:250;pointer-events:none;opacity:0}
+.flash.flashing{animation:flash 1s ease}
+@keyframes flash{0%{opacity:0}5%{opacity:.95}20%{opacity:.6}100%{opacity:0}}
+
+/* MAP */
+.map-screen-wrap{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.map-header{padding:12px 22px;background:var(--bg3);border-bottom:1px solid var(--line);flex-shrink:0;z-index:10;position:relative}
+.map-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-style:italic;color:var(--amber);font-weight:500}
+.map-sub{font-size:9px;color:var(--dim);letter-spacing:2px;margin-top:2px;text-transform:uppercase}
+
+#leafletMap{flex:1;background:var(--bg);position:relative;z-index:1}
+.leaflet-tile-pane{filter:sepia(.55) hue-rotate(-12deg) saturate(.85) brightness(.8) contrast(1.05)}
+.leaflet-container{background:#1A1410 !important;font-family:'IBM Plex Mono',monospace !important}
+.leaflet-control-attribution{background:rgba(13,11,8,.7) !important;color:var(--dim) !important;font-size:7px !important;letter-spacing:.5px;padding:1px 5px !important}
+.leaflet-control-attribution a{color:var(--amber-l) !important;text-decoration:none}
+.leaflet-control-zoom{border:1px solid var(--line2) !important;margin:14px !important;display:none}
+
+/* FILM-FRAME PINS */
+.film-pin{background:transparent !important;border:none !important}
+.film-pin .pf{width:14px;height:14px;background:var(--paper);border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;transform:rotate(-3deg);transition:transform .2s}
+.film-pin .pf::before{content:'';width:8px;height:8px;background:var(--rust)}
+.film-pin.visited .pf{background:var(--amber);border-color:var(--ink);transform:rotate(0) scale(1.4);box-shadow:0 0 0 3px rgba(212,165,116,.25)}
+.film-pin.visited .pf::before{background:var(--ink)}
+.film-pin.selected .pf{background:var(--amber-l);transform:rotate(0) scale(1.5);box-shadow:0 0 0 4px rgba(232,200,152,.35)}
+
+.bottom-sheet{position:absolute;left:14px;right:14px;bottom:14px;background:rgba(15,11,8,.94);backdrop-filter:blur(10px);border:1px solid var(--line2);padding:14px 16px;z-index:400;display:none}
+.bottom-sheet.show{display:block}
+.bs-grab{width:34px;height:3px;background:var(--line2);border-radius:2px;margin:0 auto 10px}
+.bs-name{font-family:'Cormorant Garamond',serif;font-size:19px;font-style:italic;color:var(--amber);font-weight:500;line-height:1.1}
+.bs-addr{font-size:10px;color:var(--dim2);letter-spacing:1px;margin-top:3px;text-transform:uppercase}
+.bs-stats{display:flex;gap:18px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line2)}
+.bs-stat .k{font-size:8px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase}
+.bs-stat .v{font-family:'Cormorant Garamond',serif;font-size:15px;color:var(--text);font-style:italic;font-weight:500;margin-top:1px}
+
+.map-empty{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;padding:24px;text-align:center;z-index:5;background:var(--bg);pointer-events:none}
+.map-empty.show{display:flex;pointer-events:auto}
+.map-empty .msg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:18px;color:var(--text);margin-bottom:8px}
+.map-empty .sub{font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase}
+.map-empty .btn{margin-top:18px;padding:9px 18px;border:1px solid var(--amber);color:var(--amber);font-size:10px;letter-spacing:2.5px;font-weight:600;cursor:pointer;background:transparent;font-family:'IBM Plex Mono',monospace;text-transform:uppercase}
+.map-empty .btn:active{background:var(--amber);color:var(--bg3)}
+
+.map-loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6;font-size:10px;letter-spacing:2px;color:var(--amber);text-transform:uppercase;display:none}
+.map-loading.show{display:block;animation:blink 1.4s ease-in-out infinite}
+
+/* DARKROOM */
+.dr-header{padding:18px 22px 14px;background:var(--bg3);border-bottom:1px solid var(--line);text-align:center;flex-shrink:0;position:relative;z-index:4}
+.dr-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-style:italic;color:var(--amber);font-weight:500}
+.dr-sub{font-size:9px;color:var(--dim);letter-spacing:3px;margin-top:3px;text-transform:uppercase}
+
+.dr-body{flex:1;overflow-y:auto;padding:20px 22px 30px;scrollbar-width:none;-webkit-overflow-scrolling:touch;transform:translateZ(0);contain:layout style paint}
+.dr-body::-webkit-scrollbar{display:none}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);margin-bottom:24px;border:1px solid var(--line)}
+.stat{background:var(--bg2);padding:14px 8px;text-align:center}
+.stat-num{font-family:'Cormorant Garamond',serif;font-size:30px;color:var(--amber);font-style:italic;font-weight:500;line-height:1}
+.stat-label{font-size:8px;color:var(--dim2);letter-spacing:1.5px;margin-top:5px;text-transform:uppercase}
+
+.badge-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
+.badge{aspect-ratio:1;background:var(--bg2);border:1px solid var(--line2);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;text-align:center}
+.badge.earned{background:var(--amber);border-color:var(--amber)}
+.badge.earned .b-icon,.badge.earned .b-name{color:var(--bg3)}
+.b-icon{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--dim);font-style:italic;line-height:1}
+.b-name{font-size:7px;color:var(--dim2);letter-spacing:.8px;margin-top:3px;text-transform:uppercase;font-weight:600}
+
+.h-section{font-family:'Cormorant Garamond',serif;font-size:11px;color:var(--dim2);letter-spacing:3px;font-weight:600;text-transform:uppercase;margin:18px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+
+.dr-action{margin-top:24px;padding:9px 14px;border:1px solid var(--line2);color:var(--dim2);font-size:10px;letter-spacing:2px;font-weight:600;cursor:pointer;background:transparent;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;width:100%}
+.dr-action:active{color:var(--rust);border-color:var(--rust)}
+
+/* CITY PICKER OVERLAY */
+.cp-overlay{position:absolute;inset:0;background:rgba(13,11,8,.96);z-index:500;display:none;flex-direction:column;padding:50px 28px 24px;animation:fadeIn .35s ease}
+.cp-overlay.show{display:flex}
+.cp-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:var(--grain);mix-blend-mode:overlay;opacity:.7;z-index:0}
+.cp-overlay > *{position:relative;z-index:1}
+.cp-close{position:absolute;top:18px;right:22px;color:var(--dim);font-size:18px;cursor:pointer;z-index:2}
+.cp-eyebrow{font-size:9px;color:var(--amber);letter-spacing:3px;font-weight:600;text-transform:uppercase;margin-bottom:8px}
+.cp-title{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:32px;color:var(--text);line-height:1.1;font-weight:500;margin-bottom:6px}
+.cp-title em{color:var(--amber)}
+.cp-help{font-size:10px;color:var(--dim);letter-spacing:1px;margin-bottom:26px;line-height:1.7;text-transform:uppercase}
+.cp-input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--amber);padding:8px 0 10px;color:var(--amber);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:24px;font-weight:500;outline:none;margin-bottom:18px}
+.cp-input::placeholder{color:var(--dim);font-style:italic}
+.cp-results{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.cp-result{padding:14px 0;border-bottom:1px dotted var(--line2);cursor:pointer}
+.cp-result:active{background:rgba(212,165,116,.05)}
+.cp-result .name{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:18px;color:var(--text);font-weight:500;line-height:1.2}
+.cp-result .meta{font-size:9px;color:var(--dim);letter-spacing:1.2px;margin-top:3px;text-transform:uppercase}
+.cp-status{font-size:10px;color:var(--dim2);letter-spacing:2px;margin-top:20px;text-align:center;text-transform:uppercase}
+.cp-status.err{color:var(--rust)}
+
+/* TOASTS */
+.toast{position:absolute;bottom:90px;left:24px;right:24px;background:rgba(13,11,8,.95);border:1px solid var(--line2);padding:11px 14px;z-index:300;display:none;font-size:11px;color:var(--text);letter-spacing:.5px;animation:fadeIn .25s ease}
+.toast.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="device">
+  <div class="flash" id="flash"></div>
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <span>●●● ⚡ 100</span>
+  </div>
+
+  <!-- HOME -->
+  <div class="screen active" data-screen="home">
+    <div class="home-header">
+      <div class="brand-row">
+        <div class="brand">The<span>CafFiend</span></div>
+      </div>
+      <div class="city-row" onclick="openCityPicker()">
+        <span class="city-pin">◇</span>
+        <span class="city-name unset" id="cityNameHome">Set your city</span>
+      </div>
+      <div class="exif">
+        <span>ISO<b>400</b></span><span>f/<b>2.8</b></span><span>1/<b>125</b></span><span>FRAMES<b id="frameCount">0</b></span>
+      </div>
+    </div>
+    <div class="roll">
+      <div class="sprocket-strip" aria-hidden="true">
+        <span class="sprocket"></span><span class="sprocket"></span><span class="sprocket"></span>
+        <span class="sprocket"></span><span class="sprocket"></span><span class="sprocket"></span>
+        <span class="sprocket"></span><span class="sprocket"></span><span class="sprocket"></span>
+        <span class="sprocket"></span><span class="sprocket"></span><span class="sprocket"></span>
+        <span class="sprocket"></span><span class="sprocket"></span><span class="sprocket"></span>
+        <span class="sprocket"></span><span class="sprocket"></span><span class="sprocket"></span>
+      </div>
+      <div class="feed" id="feed"></div>
+    </div>
+    <div class="shutter-bar">
+      <div class="shutter" onclick="goto('capture')">
+        <span class="shutter-label">SHOOT NEW ROLL</span>
+      </div>
+    </div>
+    <div class="tabbar">
+      <div class="tab active" onclick="goto('home')"><span class="ti">◉</span>ROLL</div>
+      <div class="tab" onclick="goto('map')"><span class="ti">◇</span>FIELD</div>
+      <div class="tab" onclick="goto('darkroom')"><span class="ti">⬛</span>DARKROOM</div>
+    </div>
+  </div>
+
+  <!-- DETAIL -->
+  <div class="screen" data-screen="detail">
+    <div class="detail-back" onclick="goto('home')">
+      <span class="back-arrow">◀</span>
+      <span class="back-label">CONTACT SHEET</span>
+      <span class="detail-frame-no" id="detailFrameNo">FRAME · 0</span>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+    <div class="tabbar">
+      <div class="tab active" onclick="goto('home')"><span class="ti">◉</span>ROLL</div>
+      <div class="tab" onclick="goto('map')"><span class="ti">◇</span>FIELD</div>
+      <div class="tab" onclick="goto('darkroom')"><span class="ti">⬛</span>DARKROOM</div>
+    </div>
+  </div>
+
+  <!-- CAPTURE -->
+  <div class="screen" data-screen="capture">
+    <div class="detail-back" onclick="goto('home')">
+      <span class="back-arrow">◀</span>
+      <span class="back-label">CANCEL</span>
+      <span class="detail-frame-no" id="captureFrameNo">FRAME · 1</span>
+    </div>
+    <div class="capture">
+      <div class="viewfinder">
+        <video class="cam-video" id="cam" playsinline autoplay muted></video>
+        <div class="cam-error" id="camError" onclick="startCamera()">Camera unavailable<br><br>Tap to retry · or grant permission in settings</div>
+        <span class="vf-corner tl"></span><span class="vf-corner tr"></span>
+        <span class="vf-corner bl"></span><span class="vf-corner br"></span>
+        <div class="vf-readout">
+          <div class="vf-rec"><span class="dot"></span>REC</div>
+          <div class="vf-frame" id="captureVfFrame">FRAME 1</div>
+          <div class="vf-iso">ISO 400</div>
+        </div>
+        <div class="reticle">
+          <span class="cross-h"></span><span class="cross-v"></span>
+        </div>
+      </div>
+      <div class="capture-fields">
+        <div class="field" id="cafeField">
+          <div class="field-label">Café</div>
+          <input class="field-input" id="cafeInput" placeholder="Café name…" autocomplete="off">
+          <div class="suggestions" id="cafeSuggestions"></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Order</div>
+          <input class="field-input" id="orderInput" placeholder="What did you drink…">
+        </div>
+        <div class="field">
+          <div class="field-label">Mode</div>
+          <div class="dial" id="modeDial">
+            <span class="dial-opt selected" data-val="sit-in" onclick="pickDial(this)">SIT-IN</span>
+            <span class="dial-opt" data-val="to-go" onclick="pickDial(this)">TO-GO</span>
+            <span class="dial-opt" data-val="worked" onclick="pickDial(this)">WORKED</span>
+            <span class="dial-opt" data-val="read" onclick="pickDial(this)">READ</span>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label">Rating · f-stop</div>
+          <div class="f-stops" id="fStops">
+            <div class="f-stop" data-val="f/16" onclick="pickStop(this)">f/16</div>
+            <div class="f-stop" data-val="f/8" onclick="pickStop(this)">f/8</div>
+            <div class="f-stop" data-val="f/4" onclick="pickStop(this)">f/4</div>
+            <div class="f-stop selected" data-val="f/2.8" onclick="pickStop(this)">f/2.8</div>
+            <div class="f-stop" data-val="f/2" onclick="pickStop(this)">f/2</div>
+            <div class="f-stop" data-val="f/1.4" onclick="pickStop(this)">f/1.4</div>
+          </div>
+        </div>
+      </div>
+      <div class="shoot-btn">
+        <div class="big-shutter" onclick="shoot()"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="screen" data-screen="map">
+    <div class="map-header">
+      <div class="map-title" id="mapTitle">Field Map</div>
+      <div class="map-sub" id="mapSub">No city set</div>
+    </div>
+    <div class="map-screen-wrap">
+      <div id="leafletMap"></div>
+      <div class="map-loading" id="mapLoading">Loading cafés…</div>
+      <div class="map-empty" id="mapEmpty">
+        <div class="msg">No city selected</div>
+        <div class="sub">Pick a city to find cafés nearby</div>
+        <button class="btn" onclick="openCityPicker()">Set city</button>
+      </div>
+      <div class="bottom-sheet" id="bottomSheet"></div>
+    </div>
+    <div class="tabbar">
+      <div class="tab" onclick="goto('home')"><span class="ti">◉</span>ROLL</div>
+      <div class="tab active" onclick="goto('map')"><span class="ti">◇</span>FIELD</div>
+      <div class="tab" onclick="goto('darkroom')"><span class="ti">⬛</span>DARKROOM</div>
+    </div>
+  </div>
+
+  <!-- DARKROOM -->
+  <div class="screen" data-screen="darkroom">
+    <div class="dr-header">
+      <div class="dr-title">The Darkroom</div>
+      <div class="dr-sub" id="drSub">est. today</div>
+    </div>
+    <div class="dr-body" id="drBody"></div>
+    <div class="tabbar">
+      <div class="tab" onclick="goto('home')"><span class="ti">◉</span>ROLL</div>
+      <div class="tab" onclick="goto('map')"><span class="ti">◇</span>FIELD</div>
+      <div class="tab active" onclick="goto('darkroom')"><span class="ti">⬛</span>DARKROOM</div>
+    </div>
+  </div>
+
+  <!-- CITY PICKER -->
+  <div class="cp-overlay" id="cityPicker">
+    <span class="cp-close" onclick="closeCityPicker()">✕</span>
+    <div class="cp-eyebrow">Field Setup</div>
+    <h2 class="cp-title">Where are you <em>shooting</em>?</h2>
+    <p class="cp-help">Enter any city · we'll find the cafés</p>
+    <input class="cp-input" id="cityInput" placeholder="e.g. Brooklyn, Lisbon, Mexico City…" autocomplete="off">
+    <div class="cp-results" id="cityResults"></div>
+    <div class="cp-status" id="cityStatus"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<canvas id="cap" hidden></canvas>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+/* ============== STATE ============== */
+const STORAGE_KEY = 'caffiend.v2';
+const state = {
+  city: null,        // { name, lat, lon, bbox }
+  cafes: [],         // [{ id, name, lat, lon, addr }]
+  visits: [],        // [{ id, frame, cafe, order, mode, rating, photo, ts, lat, lon }]
+  selectedCafe: null,
+  detailId: null,
+};
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){ Object.assign(state, JSON.parse(raw)); }
+  }catch(e){}
+}
+function saveState(){
+  try{
+    const { city, cafes, visits } = state;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ city, cafes, visits }));
+  }catch(e){
+    if(e.name === 'QuotaExceededError'){
+      // Drop oldest photo data to free space
+      const visit = [...state.visits].reverse().find(v => v.photo);
+      if(visit){ visit.photo = null; saveState(); }
+    }
+  }
+}
+
+/* ============== UTILS ============== */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function formatDate(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  const days = (Date.now() - ts) / 86400000;
+  if(days < 1) return 'today';
+  if(days < 2) return 'yesterday';
+  if(days < 7) return `${Math.floor(days)} days ago`;
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+function toast(msg, dur=2200){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+/* ============== CITY PICKER + GEOCODING ============== */
+function openCityPicker(){
+  $('#cityPicker').classList.add('show');
+  setTimeout(()=>$('#cityInput').focus(), 100);
+}
+function closeCityPicker(){
+  if(!state.city){ toast('Pick a city to continue'); return; }
+  $('#cityPicker').classList.remove('show');
+}
+
+let geocodeTimer = null;
+$('#cityInput').addEventListener('input', e => {
+  const q = e.target.value.trim();
+  clearTimeout(geocodeTimer);
+  $('#cityStatus').textContent = '';
+  $('#cityStatus').classList.remove('err');
+  if(q.length < 2){ $('#cityResults').innerHTML=''; return; }
+  $('#cityStatus').textContent = 'searching…';
+  geocodeTimer = setTimeout(() => geocodeCity(q), 450);
+});
+$('#cityInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    const first = $('#cityResults .cp-result');
+    if(first) first.click();
+  }
+});
+
+async function geocodeCity(q){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1`;
+    const res = await fetch(url, { headers: { 'Accept-Language':'en' } });
+    if(!res.ok) throw new Error('geocoding failed');
+    const data = await res.json();
+    const cities = data.filter(d => ['city','town','village','suburb','county','administrative','municipality','neighbourhood'].includes(d.type) || d.class === 'place' || d.class === 'boundary');
+    const useThese = cities.length ? cities : data;
+    if(!useThese.length){
+      $('#cityStatus').textContent = 'no places found';
+      $('#cityStatus').classList.add('err');
+      $('#cityResults').innerHTML = '';
+      return;
+    }
+    $('#cityStatus').textContent = '';
+    $('#cityResults').innerHTML = useThese.slice(0,6).map(d => `
+      <div class="cp-result" data-lat="${d.lat}" data-lon="${d.lon}" data-name="${escapeHtml(formatCityName(d))}" data-bbox="${d.boundingbox.join(',')}">
+        <div class="name">${escapeHtml(formatCityName(d))}</div>
+        <div class="meta">${escapeHtml(d.display_name)}</div>
+      </div>
+    `).join('');
+    $$('#cityResults .cp-result').forEach(el => el.addEventListener('click', () => selectCity(el)));
+  }catch(e){
+    $('#cityStatus').textContent = 'connection error · try again';
+    $('#cityStatus').classList.add('err');
+  }
+}
+
+function formatCityName(d){
+  const a = d.address || {};
+  const primary = a.city || a.town || a.village || a.suburb || a.county || a.municipality || d.name || d.display_name.split(',')[0];
+  const secondary = a.state || a.country_code?.toUpperCase() || a.country;
+  return secondary && secondary !== primary ? `${primary}, ${secondary}` : primary;
+}
+
+async function selectCity(el){
+  const city = {
+    name: el.dataset.name,
+    lat: parseFloat(el.dataset.lat),
+    lon: parseFloat(el.dataset.lon),
+    bbox: el.dataset.bbox.split(',').map(parseFloat)
+  };
+  state.city = city;
+  state.selectedCafe = null;
+  saveState();
+  $('#cityPicker').classList.remove('show');
+  $('#cityInput').value = '';
+  $('#cityResults').innerHTML = '';
+  updateUI();
+  await loadCafes();
+  if(currentScreen === 'map') renderMap();
+}
+
+/* ============== OVERPASS CAFÉ DATA ============== */
+async function loadCafes(){
+  if(!state.city) return;
+  $('#mapLoading').classList.add('show');
+  try{
+    const { lat, lon } = state.city;
+    const radius = 5000;
+    const query = `[out:json][timeout:25];(node["amenity"="cafe"](around:${radius},${lat},${lon});node["shop"="coffee"](around:${radius},${lat},${lon}););out body 80;`;
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method:'POST',
+      body: query
+    });
+    if(!res.ok) throw new Error('overpass failed');
+    const data = await res.json();
+    state.cafes = (data.elements||[])
+      .filter(c => c.tags && c.tags.name)
+      .map(c => ({
+        id: c.id,
+        name: c.tags.name,
+        lat: c.lat,
+        lon: c.lon,
+        addr: [c.tags['addr:housenumber'], c.tags['addr:street']].filter(Boolean).join(' ') || c.tags['addr:city'] || ''
+      }));
+    saveState();
+    $('#mapSub').textContent = `${state.city.name} · ${state.cafes.length} cafés nearby`;
+  }catch(e){
+    toast('Couldn\'t load cafés · check connection');
+  }finally{
+    $('#mapLoading').classList.remove('show');
+  }
+}
+
+/* ============== UI RENDERING ============== */
+function updateUI(){
+  const cityEl = $('#cityNameHome');
+  if(state.city){
+    cityEl.textContent = state.city.name;
+    cityEl.classList.remove('unset');
+  } else {
+    cityEl.textContent = 'Set your city';
+    cityEl.classList.add('unset');
+  }
+  $('#frameCount').textContent = state.visits.length;
+  $('#mapTitle').textContent = state.city ? state.city.name : 'Field Map';
+  $('#mapSub').textContent = state.city ? (state.cafes.length ? `${state.city.name} · ${state.cafes.length} cafés nearby` : state.city.name) : 'No city set';
+  renderFeed();
+  renderDarkroom();
+}
+
+function renderFeed(){
+  const feed = $('#feed');
+  if(!state.visits.length){
+    feed.innerHTML = `
+      <div class="empty-roll">
+        <div class="icon">○</div>
+        <div class="msg">No frames yet</div>
+        <div class="sub">Tap the shutter<br>to shoot your first</div>
+      </div>
+    `;
+    return;
+  }
+  const rots = [-2.5, 1.8, -1.5, 2.2, -2, 1.4, -1.8];
+  feed.innerHTML = state.visits.map((v, i) => {
+    const rot = rots[i % rots.length];
+    const photoStyle = v.photo
+      ? `style="background-image:url(${v.photo});background-size:cover;background-position:center"`
+      : '';
+    const photoClass = v.photo ? 'photo' : 'photo placeholder';
+    return `
+      <div class="polaroid dev-in" style="--rot:${rot}deg;animation-delay:${Math.min(i*.08, .4)}s" onclick="openDetail('${v.id}')">
+        <div class="frame-no">${v.frame}</div>
+        <div class="${photoClass}" ${photoStyle}></div>
+        <div class="caption">${escapeHtml(v.cafe)}</div>
+        <div class="subcaption">${escapeHtml((v.order||'').toLowerCase())}${v.order ? ' · ' : ''}${formatDate(v.ts)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openDetail(id){
+  const v = state.visits.find(x => String(x.id) === String(id));
+  if(!v) return;
+  state.detailId = id;
+  $('#detailFrameNo').textContent = `FRAME · ${v.frame}`;
+  const photoStyle = v.photo
+    ? `style="background-image:url(${v.photo});background-size:cover;background-position:center"`
+    : '';
+  const photoClass = v.photo ? 'photo' : 'photo placeholder';
+  const priorVisits = state.visits.filter(x => x.cafe === v.cafe && x.id !== v.id);
+  $('#detailBody').innerHTML = `
+    <div class="hero-polaroid">
+      <div class="${photoClass}" ${photoStyle}></div>
+      <div class="caption">${escapeHtml(v.cafe)}</div>
+      <div class="subcaption">${escapeHtml(formatDate(v.ts))}</div>
+    </div>
+    <div class="section-label">Exposure Data</div>
+    <div class="metadata-grid">
+      <div><div class="meta-key">Order</div><div class="meta-val">${escapeHtml(v.order || '—')}</div></div>
+      <div><div class="meta-key">Mode</div><div class="meta-val">${escapeHtml(v.mode || '—')}</div></div>
+      <div><div class="meta-key">Rating</div><div class="meta-val">${escapeHtml(v.rating || '—')}</div></div>
+      <div><div class="meta-key">Date</div><div class="meta-val">${new Date(v.ts).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</div></div>
+    </div>
+    ${priorVisits.length ? `
+      <div class="section-label">Prior Frames at this Café</div>
+      ${priorVisits.slice(0,6).map(p => `
+        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dotted var(--line2);font-size:11px">
+          <span style="color:var(--dim2);font-size:10px">${formatDate(p.ts).toUpperCase()}</span>
+          <span style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--amber-l)">${escapeHtml(p.order || '—')}</span>
+          <span style="color:var(--amber);font-weight:600">${escapeHtml(p.rating || '—')}</span>
+        </div>
+      `).join('')}
+    ` : ''}
+    <button class="dr-action" onclick="deleteVisit('${v.id}')" style="margin-top:30px">Delete this frame</button>
+  `;
+  goto('detail');
+}
+
+function deleteVisit(id){
+  if(!confirm('Delete this frame? This cannot be undone.')) return;
+  state.visits = state.visits.filter(v => String(v.id) !== String(id));
+  saveState();
+  updateUI();
+  goto('home');
+}
+
+function renderDarkroom(){
+  const uniqueCafes = new Set(state.visits.map(v => v.cafe.toLowerCase())).size;
+  const frames = state.visits.length;
+  const rolls = Math.ceil(frames / 24) || 0;
+  const earliestTs = state.visits.length ? Math.min(...state.visits.map(v => v.ts)) : Date.now();
+  const establishedDate = new Date(earliestTs).toLocaleDateString(undefined,{month:'short',year:'numeric'}).toLowerCase();
+
+  $('#drSub').textContent = state.visits.length ? `est. ${establishedDate}` : 'est. today';
+
+  const badges = [
+    { name:'First Roll', icon:'i', earned: frames >= 1 },
+    { name:'Ten Frames', icon:'ii', earned: frames >= 10 },
+    { name:'Roll One', icon:'iii', earned: frames >= 24 },
+    { name:'Wide Lens', icon:'iv', earned: uniqueCafes >= 5 },
+    { name:'Macro', icon:'v', earned: uniqueCafes >= 10 },
+    { name:'Tele', icon:'vi', earned: frames >= 50 },
+    { name:'Studio', icon:'vii', earned: uniqueCafes >= 20 },
+    { name:'Field', icon:'viii', earned: frames >= 100 },
+  ];
+
+  const rollList = [];
+  for(let r = 1; r <= Math.max(rolls,1); r++){
+    const count = Math.min(24, frames - (r-1)*24);
+    if(count <= 0) break;
+    const isComplete = count === 24;
+    rollList.push({ num: r, count, isComplete });
+  }
+
+  $('#drBody').innerHTML = `
+    <div class="stats-row">
+      <div class="stat"><div class="stat-num">${frames}</div><div class="stat-label">Frames</div></div>
+      <div class="stat"><div class="stat-num">${uniqueCafes}</div><div class="stat-label">Cafés</div></div>
+      <div class="stat"><div class="stat-num">${rolls}</div><div class="stat-label">Rolls</div></div>
+    </div>
+    <div class="h-section">Develop · Badges</div>
+    <div class="badge-row">
+      ${badges.map(b => `
+        <div class="badge ${b.earned?'earned':''}">
+          <div class="b-icon">${b.icon}</div>
+          <div class="b-name">${b.name}</div>
+        </div>
+      `).join('')}
+    </div>
+    ${rollList.length ? `
+      <div class="h-section">Rolls</div>
+      <div>
+        ${rollList.reverse().map(r => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px dotted var(--line2)">
+            <div>
+              <div style="font-family:'Cormorant Garamond',serif;font-size:15px;color:var(--text);font-style:italic;font-weight:500">Roll · #${r.num}</div>
+              <div style="font-size:9px;color:var(--dim);letter-spacing:1px;margin-top:2px">${r.isComplete ? 'DEVELOPED' : 'IN PROGRESS'}</div>
+            </div>
+            <div style="font-size:10px;color:var(--amber);letter-spacing:1px;font-weight:600">${r.count} / 24</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+    <div class="h-section">Settings</div>
+    <button class="dr-action" onclick="openCityPicker()">Change city · ${state.city ? escapeHtml(state.city.name) : 'not set'}</button>
+    ${state.visits.length ? `<button class="dr-action" onclick="resetAll()" style="margin-top:10px">Reset all data</button>` : ''}
+  `;
+}
+
+function resetAll(){
+  if(!confirm('Delete ALL frames and cafés? This cannot be undone.')) return;
+  state.visits = [];
+  state.cafes = [];
+  saveState();
+  updateUI();
+  toast('All data cleared');
+}
+
+/* ============== LEAFLET MAP ============== */
+let map = null;
+let markers = [];
+
+function renderMap(){
+  if(!state.city){
+    $('#mapEmpty').classList.add('show');
+    return;
+  }
+  $('#mapEmpty').classList.remove('show');
+  if(!map){
+    map = L.map('leafletMap', {
+      zoomControl: false,
+      attributionControl: true
+    }).setView([state.city.lat, state.city.lon], 14);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OSM'
+    }).addTo(map);
+    map.on('click', () => {
+      state.selectedCafe = null;
+      $('#bottomSheet').classList.remove('show');
+      markers.forEach(m => m._el?.classList?.remove('selected'));
+    });
+  } else {
+    map.setView([state.city.lat, state.city.lon], 14);
+  }
+  setTimeout(() => map.invalidateSize(), 80);
+  renderPins();
+}
+
+function renderPins(){
+  if(!map) return;
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  state.cafes.forEach(cafe => {
+    const visited = state.visits.some(v => v.cafeId === cafe.id || v.cafe.toLowerCase() === cafe.name.toLowerCase());
+    const icon = L.divIcon({
+      className: 'film-pin' + (visited ? ' visited' : ''),
+      html: '<div class="pf"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8]
+    });
+    const marker = L.marker([cafe.lat, cafe.lon], { icon }).addTo(map);
+    marker.on('click', () => selectCafe(cafe));
+    markers.push(marker);
+  });
+}
+
+function selectCafe(cafe){
+  state.selectedCafe = cafe;
+  const visits = state.visits.filter(v => v.cafe.toLowerCase() === cafe.name.toLowerCase());
+  const avgRating = visits.length ? avgFStop(visits.map(v => v.rating).filter(Boolean)) : null;
+  const last = visits.length ? formatDate(Math.max(...visits.map(v => v.ts))) : '—';
+  $('#bottomSheet').innerHTML = `
+    <div class="bs-grab"></div>
+    <div class="bs-name">${escapeHtml(cafe.name)}</div>
+    <div class="bs-addr">${escapeHtml(cafe.addr || 'address unknown')}</div>
+    <div class="bs-stats">
+      <div class="bs-stat"><div class="k">Frames</div><div class="v">${visits.length}</div></div>
+      <div class="bs-stat"><div class="k">Avg f-stop</div><div class="v">${avgRating || '—'}</div></div>
+      <div class="bs-stat"><div class="k">Last visit</div><div class="v">${last}</div></div>
+    </div>
+  `;
+  $('#bottomSheet').classList.add('show');
+}
+
+function avgFStop(stops){
+  const map = { 'f/16':16, 'f/8':8, 'f/4':4, 'f/2.8':2.8, 'f/2':2, 'f/1.4':1.4 };
+  const vals = stops.map(s => map[s]).filter(v => v != null);
+  if(!vals.length) return null;
+  const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+  // Return nearest stop
+  return Object.keys(map).reduce((best, k) => Math.abs(map[k]-avg) < Math.abs(map[best]-avg) ? k : best, 'f/2.8');
+}
+
+/* ============== CAMERA ============== */
+let stream = null;
+
+async function startCamera(){
+  const video = $('#cam');
+  const err = $('#camError');
+  try{
+    if(!navigator.mediaDevices?.getUserMedia){ throw new Error('Not supported'); }
+    if(stream) return;
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    err.classList.remove('show');
+    video.style.display = 'block';
+  }catch(e){
+    stream = null;
+    video.style.display = 'none';
+    err.classList.add('show');
+    if(e.name === 'NotAllowedError'){
+      err.innerHTML = 'Camera permission denied<br><br>Tap to retry · or enable in browser settings';
+    } else if(location.protocol === 'file:'){
+      err.innerHTML = 'Camera needs HTTPS<br><br>Deploy this to Netlify to use the camera';
+    } else {
+      err.innerHTML = 'Camera unavailable<br><br>Tap to retry';
+    }
+  }
+}
+
+function stopCamera(){
+  if(stream){
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    $('#cam').srcObject = null;
+  }
+}
+
+function capturePhoto(){
+  const video = $('#cam');
+  const canvas = $('#cap');
+  if(!stream || !video.videoWidth) return null;
+  const maxW = 1100;
+  const scale = Math.min(1, maxW / video.videoWidth);
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.filter = 'sepia(.25) saturate(1.15) contrast(1.1) brightness(.95)';
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.82);
+}
+
+/* ============== CAPTURE FORM HANDLERS ============== */
+function pickDial(el){
+  el.parentNode.querySelectorAll('.dial-opt').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function pickStop(el){
+  el.parentNode.querySelectorAll('.f-stop').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// Café autocomplete from loaded cafés
+$('#cafeInput').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const sug = $('#cafeSuggestions');
+  if(q.length < 1 || !state.cafes.length){ sug.classList.remove('show'); return; }
+  const matches = state.cafes
+    .filter(c => c.name.toLowerCase().includes(q))
+    .slice(0, 6);
+  if(!matches.length){ sug.classList.remove('show'); return; }
+  sug.innerHTML = matches.map(c => `
+    <div class="sug" data-name="${escapeHtml(c.name)}" data-id="${c.id}">
+      ${escapeHtml(c.name)}
+      ${c.addr ? `<div class="sug-addr">${escapeHtml(c.addr)}</div>` : ''}
+    </div>
+  `).join('');
+  sug.classList.add('show');
+  sug.querySelectorAll('.sug').forEach(el => el.addEventListener('click', () => {
+    $('#cafeInput').value = el.dataset.name;
+    $('#cafeInput').dataset.cafeId = el.dataset.id;
+    sug.classList.remove('show');
+  }));
+});
+document.addEventListener('click', e => {
+  if(!e.target.closest('#cafeField')){ $('#cafeSuggestions').classList.remove('show'); }
+});
+
+function shoot(){
+  const dataURL = capturePhoto();
+  const flash = $('#flash');
+  flash.classList.remove('flashing');
+  void flash.offsetWidth;
+  flash.classList.add('flashing');
+
+  const cafe = $('#cafeInput').value.trim() || 'Unnamed café';
+  const order = $('#orderInput').value.trim();
+  const mode = $('#modeDial .selected')?.dataset.val || '';
+  const rating = $('#fStops .selected')?.dataset.val || '';
+  const cafeId = $('#cafeInput').dataset.cafeId ? parseInt($('#cafeInput').dataset.cafeId) : null;
+
+  const visit = {
+    id: Date.now(),
+    frame: state.visits.length + 1,
+    cafe, order, mode, rating,
+    cafeId,
+    photo: dataURL,
+    ts: Date.now()
+  };
+
+  setTimeout(() => {
+    state.visits.unshift(visit);
+    saveState();
+    $('#cafeInput').value = '';
+    $('#orderInput').value = '';
+    delete $('#cafeInput').dataset.cafeId;
+    updateUI();
+    goto('home');
+  }, 850);
+}
+
+/* ============== NAVIGATION ============== */
+let currentScreen = 'home';
+function goto(name){
+  currentScreen = name;
+  $$('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === name));
+  if(name === 'capture'){
+    if(!state.city){ toast('Set your city first'); openCityPicker(); goto('home'); return; }
+    $('#captureFrameNo').textContent = `FRAME · ${state.visits.length + 1}`;
+    $('#captureVfFrame').textContent = `FRAME ${state.visits.length + 1}`;
+    startCamera();
+  } else {
+    stopCamera();
+  }
+  if(name === 'map'){ renderMap(); }
+}
+
+/* ============== INIT ============== */
+loadState();
+updateUI();
+if(!state.city){
+  setTimeout(() => openCityPicker(), 600);
+} else if(!state.cafes.length){
+  loadCafes();
+}
+</script>
+
+</body>
+</html>
