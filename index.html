@@ -114,7 +114,7 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
 /* CAPTURE */
 .capture{flex:1;display:flex;flex-direction:column;background:var(--bg3);position:relative}
 .viewfinder{flex:1;display:flex;flex-direction:column;padding:16px 22px;position:relative;overflow:hidden;border-bottom:1px solid var(--line);min-height:160px}
-.cam-video{position:absolute;top:24px;left:24px;right:24px;bottom:24px;width:auto;height:auto;object-fit:contain;filter:sepia(.25) saturate(1.15) contrast(1.1) brightness(.95);background:#000;z-index:0}
+.cam-video{position:absolute;top:24px;left:24px;right:24px;bottom:24px;width:calc(100% - 48px);height:calc(100% - 48px);object-fit:cover;object-position:center;filter:sepia(.25) saturate(1.15) contrast(1.1) brightness(.95);background:#000;z-index:0}
 .cam-error{position:absolute;top:24px;left:24px;right:24px;bottom:24px;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:10px;color:var(--dim2);letter-spacing:2px;background:var(--bg2);line-height:1.7;z-index:0;cursor:pointer;text-transform:uppercase}
 .cam-error.show{display:flex}
 .vf-readout,.reticle{position:relative;z-index:2}
@@ -363,17 +363,6 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
             <span class="dial-opt" data-val="to-go" onclick="pickDial(this)">TO-GO</span>
             <span class="dial-opt" data-val="worked" onclick="pickDial(this)">WORKED</span>
             <span class="dial-opt" data-val="read" onclick="pickDial(this)">READ</span>
-          </div>
-        </div>
-        <div class="field">
-          <div class="field-label">Rating · f-stop</div>
-          <div class="f-stops" id="fStops">
-            <div class="f-stop" data-val="f/16" onclick="pickStop(this)">f/16</div>
-            <div class="f-stop" data-val="f/8" onclick="pickStop(this)">f/8</div>
-            <div class="f-stop" data-val="f/4" onclick="pickStop(this)">f/4</div>
-            <div class="f-stop selected" data-val="f/2.8" onclick="pickStop(this)">f/2.8</div>
-            <div class="f-stop" data-val="f/2" onclick="pickStop(this)">f/2</div>
-            <div class="f-stop" data-val="f/1.4" onclick="pickStop(this)">f/1.4</div>
           </div>
         </div>
       </div>
