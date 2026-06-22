@@ -21,9 +21,11 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{background:#000;color:var(--text);font-family:'IBM Plex Mono',monospace;overflow-x:hidden}
-body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at top,#1A1410 0%,#000 70%)}
+body{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at top,#1A1410 0%,#000 70%)}
+/* iOS: keep the tab bar / shutter clear of the home indicator. Per-browser hooks (set in JS): html.ios-safari / html.ios-chrome */
+html.ios .device{padding-bottom:env(safe-area-inset-bottom)}
 
-.device{width:100%;max-width:420px;height:100vh;max-height:880px;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+.device{width:100%;max-width:420px;height:100vh;height:100dvh;max-height:880px;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
 @media(min-width:600px){.device{border-radius:46px;border:2px solid #1A1208;height:880px;box-shadow:0 30px 80px rgba(0,0,0,.6)}}
 
 /* GRAIN — static, no continuous animation. The scrolling areas are exempted via .device-noisefree for perf */
@@ -114,8 +116,8 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
 /* CAPTURE */
 .capture{flex:1;display:flex;flex-direction:column;background:var(--bg3);position:relative}
 .viewfinder{flex:1;display:flex;flex-direction:column;padding:16px 22px;position:relative;overflow:hidden;border-bottom:1px solid var(--line);min-height:160px}
-.cam-video{position:absolute;top:24px;left:24px;right:24px;bottom:24px;width:calc(100% - 48px);height:calc(100% - 48px);object-fit:cover;object-position:center;filter:sepia(.25) saturate(1.15) contrast(1.1) brightness(.95);background:#000;z-index:0}
-.cam-error{position:absolute;top:24px;left:24px;right:24px;bottom:24px;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:10px;color:var(--dim2);letter-spacing:2px;background:var(--bg2);line-height:1.7;z-index:0;cursor:pointer;text-transform:uppercase}
+.cam-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;filter:sepia(.25) saturate(1.15) contrast(1.1) brightness(.95);background:#000;z-index:0}
+.cam-error{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:10px;color:var(--dim2);letter-spacing:2px;background:var(--bg2);line-height:1.7;z-index:0;cursor:pointer;text-transform:uppercase}
 .cam-error.show{display:flex}
 .vf-readout,.reticle{position:relative;z-index:2}
 .vf-corner{z-index:3}
@@ -177,6 +179,17 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
 .map-header{padding:12px 22px;background:var(--bg3);border-bottom:1px solid var(--line);flex-shrink:0;z-index:10;position:relative}
 .map-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-style:italic;color:var(--amber);font-weight:500}
 .map-sub{font-size:9px;color:var(--dim);letter-spacing:2px;margin-top:2px;text-transform:uppercase}
+.map-search{position:relative;margin-top:10px}
+.map-search-input{width:100%;background:var(--bg);border:1px solid var(--line2);padding:8px 12px;color:var(--amber);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;outline:none}
+.map-search-input::placeholder{color:var(--dim);font-style:italic}
+.map-search-input:focus{border-color:var(--amber)}
+.map-search-results{position:absolute;top:100%;left:0;right:0;background:var(--bg3);border:1px solid var(--line2);border-top:0;max-height:210px;overflow-y:auto;z-index:30;display:none}
+.map-search-results.show{display:block}
+.msr{padding:9px 12px;cursor:pointer;border-bottom:1px dotted var(--line2);font-family:'Cormorant Garamond',serif;font-size:14px;font-style:italic;color:var(--text)}
+.msr:last-child{border-bottom:0}
+.msr:active,.msr:hover{background:var(--bg2);color:var(--amber)}
+.msr-addr{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;margin-top:2px;font-style:normal}
+.msr-empty{padding:9px 12px;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase}
 
 #leafletMap{flex:1;background:var(--bg);position:relative;z-index:1}
 .leaflet-tile-pane{filter:sepia(.55) hue-rotate(-12deg) saturate(.85) brightness(.8) contrast(1.05)}
@@ -335,8 +348,6 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
       <div class="viewfinder">
         <video class="cam-video" id="cam" playsinline autoplay muted></video>
         <div class="cam-error" id="camError" onclick="startCamera()">Camera unavailable<br><br>Tap to retry · or grant permission in settings</div>
-        <span class="vf-corner tl"></span><span class="vf-corner tr"></span>
-        <span class="vf-corner bl"></span><span class="vf-corner br"></span>
         <div class="vf-readout">
           <div class="vf-rec"><span class="dot"></span>REC</div>
           <div class="vf-frame" id="captureVfFrame">FRAME 1</div>
@@ -377,6 +388,10 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
     <div class="map-header">
       <div class="map-title" id="mapTitle">Field Map</div>
       <div class="map-sub" id="mapSub">No city set</div>
+      <div class="map-search" id="mapSearchWrap">
+        <input class="map-search-input" id="mapSearch" placeholder="Search cafés on the map…" autocomplete="off">
+        <div class="map-search-results" id="mapSearchResults"></div>
+      </div>
     </div>
     <div class="map-screen-wrap">
       <div id="leafletMap"></div>
@@ -427,6 +442,17 @@ body{min-height:100vh;display:flex;align-items:center;justify-content:center;bac
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
+/* ===== Platform/browser detection → root classes for per-browser CSS =====
+   Adds: html.ios, html.ios-safari, html.ios-chrome  (iOS Chrome = CriOS) */
+(function(){
+  var ua = navigator.userAgent || '';
+  var isIOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isCriOS = /CriOS/.test(ua), isFxiOS = /FxiOS/.test(ua);
+  var r = document.documentElement;
+  if(isIOS) r.classList.add('ios');
+  if(isIOS && !isCriOS && !isFxiOS) r.classList.add('ios-safari');
+  if(isCriOS) r.classList.add('ios-chrome');
+})();
 /* ============== STATE ============== */
 const STORAGE_KEY = 'caffiend.v2';
 const state = {
@@ -918,6 +944,40 @@ $('#cafeInput').addEventListener('input', e => {
 });
 document.addEventListener('click', e => {
   if(!e.target.closest('#cafeField')){ $('#cafeSuggestions').classList.remove('show'); }
+});
+
+// Map search — look up loaded cafés by name, fly to them, open detail
+$('#mapSearch').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const box = $('#mapSearchResults');
+  if(q.length < 1){ box.classList.remove('show'); box.innerHTML=''; return; }
+  if(!state.cafes.length){
+    box.innerHTML = `<div class="msr-empty">Set a city first to load cafés</div>`;
+    box.classList.add('show'); return;
+  }
+  const matches = state.cafes.filter(c => c.name.toLowerCase().includes(q)).slice(0, 12);
+  if(!matches.length){
+    box.innerHTML = `<div class="msr-empty">No cafés match that name</div>`;
+    box.classList.add('show'); return;
+  }
+  box.innerHTML = matches.map(c => `
+    <div class="msr" data-id="${c.id}">
+      ${escapeHtml(c.name)}
+      ${c.addr ? `<div class="msr-addr">${escapeHtml(c.addr)}</div>` : ''}
+    </div>
+  `).join('');
+  box.classList.add('show');
+  box.querySelectorAll('.msr[data-id]').forEach(el => el.addEventListener('click', () => {
+    const cafe = state.cafes.find(c => String(c.id) === el.dataset.id);
+    if(!cafe) return;
+    box.classList.remove('show');
+    $('#mapSearch').value = cafe.name;
+    if(map){ map.flyTo([cafe.lat, cafe.lon], 16, { duration: .6 }); }
+    selectCafe(cafe);
+  }));
+});
+document.addEventListener('click', e => {
+  if(!e.target.closest('#mapSearchWrap')){ $('#mapSearchResults').classList.remove('show'); }
 });
 
 function shoot(){
